@@ -1,0 +1,89 @@
+name: Locust load test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Target host (overrides the host in locustfile.py)"
+        required: false
+        default: "https://jsonplaceholder.typicode.com"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: locust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    name: Run Locust headless
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pipenv
+          cache-dependency-path: Pipfile.lock
+
+      - name: Install pipenv
+        run: python -m pip install --upgrade pip pipenv
+
+      - name: Install dependencies from lockfile
+        run: pipenv sync
+
+      - name: Run Locust
+        # The StagesShape class in locustfile.py controls user count, spawn rate
+        # and total run time (3 minutes), then stops the test on its own.
+        # Locust exits non-zero when any request fails, which fails this job.
+        run: |
+          mkdir -p reports
+          pipenv run locust \
+            --locustfile locustfile.py \
+            --headless \
+            --host "${{ github.event.inputs.host || 'https://jsonplaceholder.typicode.com' }}" \
+            --csv reports/locust \
+            --csv-full-history \
+            --html reports/locust.html \
+            --loglevel INFO \
+            --exit-code-on-error 1
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-reports-${{ github.run_number }}
+          path: reports/
+          retention-days: 14
+
+      - name: Summarise results
+        if: always()
+        run: |
+          if [ -f reports/locust_stats.csv ]; then
+            {
+              echo "## Locust results"
+              echo
+              echo '| Name | Requests | Failures | Median (ms) | 95% (ms) | Avg (ms) | RPS |'
+              echo '|------|----------|----------|-------------|----------|----------|-----|'
+              python - <<'PY'
+          import csv
+          with open("reports/locust_stats.csv", newline="") as f:
+              for r in csv.DictReader(f):
+                  name = f'{r["Type"]} {r["Name"]}'.strip()
+                  print(f'| {name} | {r["Request Count"]} | {r["Failure Count"]} | '
+                        f'{r["Median Response Time"]} | {r["95%"]} | '
+                        f'{float(r["Average Response Time"]):.1f} | '
+                        f'{float(r["Requests/s"]):.2f} |')
+          PY
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
