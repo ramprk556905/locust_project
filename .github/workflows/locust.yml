@@ -2,9 +2,9 @@ name: Locust load test
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
   pull_request:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       host:
@@ -33,14 +33,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pipenv
-          cache-dependency-path: Pipfile.lock
+          cache: pip
+          cache-dependency-path: requirements.txt
 
-      - name: Install pipenv
-        run: python -m pip install --upgrade pip pipenv
-
-      - name: Install dependencies from lockfile
-        run: pipenv sync
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run Locust
         # The StagesShape class in locustfile.py controls user count, spawn rate
@@ -48,7 +47,7 @@ jobs:
         # Locust exits non-zero when any request fails, which fails this job.
         run: |
           mkdir -p reports
-          pipenv run locust \
+          locust \
             --locustfile locustfile.py \
             --headless \
             --host "${{ github.event.inputs.host || 'https://jsonplaceholder.typicode.com' }}" \
