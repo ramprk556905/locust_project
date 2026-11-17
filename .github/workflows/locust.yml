@@ -33,8 +33,7 @@ jobs:
         id: python
         uses: actions/setup-python@v5
         with:
-          # Must match python_full_version in the Pipfile, or pipenv refuses to sync.
-          python-version: "3.12.10"
+          python-version: "3.12"
           cache: pipenv
           cache-dependency-path: Pipfile.lock
 

@@ -1,11 +1,10 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dbf8009914cf6221a2ccec8e5ab45cca80b76b24bd3d3095d01250c21d5d606e"
+            "sha256": "36487c7410bce64466a152c367cde7dcd6c253a12947ccf5383f249fc966bac5"
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_full_version": "3.12.10",
             "python_version": "3.12"
         },
         "sources": [
@@ -491,11 +490,11 @@
         },
         "configargparse": {
             "hashes": [
-                "sha256:111cee60a789acac1ca6d3d0a4317a9c147a766214b41cbcf4d3079cb2f97e86",
-                "sha256:6c03a8cc3526af60c13d7fb31dea35f25b79d16d1e4ef33cbc16a037bfe7ceca"
+                "sha256:148ffe1ba93304bbcb4a832f513e6d51c08d214215f1e943954f6d01f2394621",
+                "sha256:8ee7c4429e6402b881c9a85569eb9484db2f63260718b45c67c59625284371c8"
             ],
             "markers": "python_version >= '3.6'",
-            "version": "==1.10.0"
+            "version": "==1.10.1"
         },
         "flask": {
             "hashes": [
