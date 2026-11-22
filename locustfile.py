@@ -1,9 +1,16 @@
+import logging
+
 from locust import HttpUser, LoadTestShape, task
+
+# Locust configures logging (level set by --loglevel) and writes to stderr,
+# so these messages show up in the GitHub Actions job log.
+logger = logging.getLogger("locustfile")
 
 
 class JsonPlaceHolder(HttpUser):
 
     host = 'https://jsonplaceholder.typicode.com'
+
     @task
     def add_post(self):
         req_body = {
@@ -11,9 +18,41 @@ class JsonPlaceHolder(HttpUser):
             'body': 'bar',
             'userId': 1
         }
-        with self.client.post('/posts', json=req_body, catch_response=True) as response:
-           if response.status_code == 201:
-              response.success()
+        try:
+            with self.client.post('/posts', json=req_body, catch_response=True) as response:
+                # status_code 0 means the request never got a response
+                # (connection error, timeout, DNS failure, ...).
+                if response.status_code == 0:
+                    logger.error("POST /posts got no response: %s", response.error)
+                    response.failure(f"No response: {response.error}")
+                    return
+
+                if response.status_code != 201:
+                    logger.warning(
+                        "POST /posts returned %s (expected 201): %s",
+                        response.status_code, response.text[:200],
+                    )
+                    response.failure(f"Unexpected status {response.status_code}")
+                    return
+
+                try:
+                    data = response.json()
+                except ValueError:
+                    logger.error("POST /posts returned invalid JSON: %s", response.text[:200])
+                    response.failure("Invalid JSON in response")
+                    return
+
+                if 'id' not in data:
+                    logger.warning("POST /posts response has no 'id' field: %s", data)
+                    response.failure("Response missing 'id'")
+                    return
+
+                logger.debug("POST /posts created post id=%s", data['id'])
+                response.success()
+        except Exception:
+            # Anything unexpected in our own code: log the traceback and keep
+            # the simulated user running instead of killing it.
+            logger.exception("Unexpected error in add_post")
 
 
 class StagesShape(LoadTestShape):

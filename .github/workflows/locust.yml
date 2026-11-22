@@ -45,7 +45,11 @@ jobs:
         # The StagesShape class in locustfile.py controls user count, spawn rate
         # and total run time (3 minutes), then stops the test on its own.
         # Locust exits non-zero when any request fails, which fails this job.
+        # Output is shown live in the job log and also saved to reports/locust.log
+        # (pipefail keeps Locust's exit code despite the pipe through tee).
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p reports
           locust \
             --locustfile locustfile.py \
@@ -55,7 +59,8 @@ jobs:
             --csv-full-history \
             --html reports/locust.html \
             --loglevel INFO \
-            --exit-code-on-error 1
+            --exit-code-on-error 1 \
+            2>&1 | tee reports/locust.log
 
       - name: Upload reports
         if: always()
@@ -85,4 +90,29 @@ jobs:
                         f'{float(r["Requests/s"]):.2f} |')
           PY
             } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f reports/locust.log ]; then
+            errors=$(grep -c '/ERROR/locustfile' reports/locust.log || true)
+            warnings=$(grep -c '/WARNING/locustfile' reports/locust.log || true)
+            {
+              echo
+              echo "## add_post log"
+              echo
+              echo "Errors: **$errors** · Warnings: **$warnings** (full log in the locust-reports artifact)"
+              if [ "$errors" -gt 0 ] || [ "$warnings" -gt 0 ]; then
+                echo
+                echo '<details><summary>First 50 warnings/errors</summary>'
+                echo
+                echo '```'
+                grep -E '/(ERROR|WARNING)/locustfile' reports/locust.log | head -n 50
+                echo '```'
+                echo '</details>'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$errors" -gt 0 ]; then
+              echo "::error title=Locust add_post::$errors error(s) logged, see job summary"
+            fi
+            if [ "$warnings" -gt 0 ]; then
+              echo "::warning title=Locust add_post::$warnings warning(s) logged, see job summary"
+            fi
           fi
